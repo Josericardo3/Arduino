@@ -130,11 +130,15 @@ script.
       this.chartPie = new Chart(this.ctxChartPie, this.graph1)
       this.chartLine = new Chart(this.ctxChartLine, this.graph2)
       this.chartBar = new Chart(this.ctxChartBar, this.graph3)
-      this.socketArduino = io.connect('http://192.168.1.12:3000/arduino',{
+      /* this.socketArduino = io.connect('http://192.168.1.12:3000/arduino',{
+        forceNew: true
+      }) */
+      this.socketArduino = io.connect('https://arduino-iot.azurewebsites.net/arduino',{
         forceNew: true
       })
       this.sockets()
       this.initMap()
+      console.log(app_name)
     },
     methods: {
       initMap() {
