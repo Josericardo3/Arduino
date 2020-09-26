@@ -1,69 +1,221 @@
 doctype html
 head
-  //
-    - Basic Page Needs
-    ==================================================
-  meta(charset='utf-8')
+  meta(charset='UTF-8')
+  meta(name='viewport', content='width=device-width, initial-scale=1.0')
   title Arqui
-  //
-    Mobile Specific Metas
-    ==================================================
-  meta(name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1')
-  //
-    CSS
-    ==================================================
-  link(rel='stylesheet' href='/static/css/layout.css')
-  link(rel='stylesheet' href='/static/css/media-queries.css')
-  link(rel='shortcut icon' href='favicon.png')
-body
-  div(id="app")
-    section#intro
-      header.row
-      // Header End
-      #main.row
-        .twelve.columns
-          h1 Revisar cambios en las casas para cobro de impuesto municipal
-          p El cobro del impuesto municipal 
-          h5 COBRO MUNICIPAL
-          #counter.cf
-            span
-              | {{ totalPay }} 
-              em Total a pagar
-            span
-              | {{ infoHouse }}
-              em Info de la casa
-            span
-              | {{ location }}
-              em Ubicacion
-      // main end
-    // end intro section
+  link(rel='stylesheet', href='/static/css/style.css')
+  link(rel='icon', type='image/png', href='/static/images/favicon2.png')
+div(id="app")
+  div(style='contenedor1')
+    .container
+      // DONUT CHART BLOCK (LEFT-CONTAINER)
+      h1(align='center')
+        | Revisar cambios en las casas  
+      div
+      //
+        h1
+      .donut-chart-block.block
+        h2.titular Total a Pagar
+        div(style="width: 300px; height: 200px; background-color: #FFFFFF !important;")
+          canvas(id="chartPie" ref="chartPie" width="300" height="200")
+      // LINE CHART BLOCK (LEFT-CONTAINER)
+      .line-chart-block.block
+        div(style="width: 300px; height: 200px; background-color: #FFFFFF !important;")
+          canvas(id="chartLine" ref="chartLine" width="300" height="200")
+        ul.time-lenght.horizontal-list
+          li
+            a.time-lenght-btn(href='#') Total a pagar de Impuesto
+        ul.month-data.clear
+          div(v-for="(item, index) in graph2.data.datasets")
+            li(v-for="(val, key) in item.data")
+              p
+                | {{ key + 1 }}
+                span.scnd-font-color  MES
+              p
+                span.entypo-plus.increment  
+                | {{ val }}
+      .bar-chart-block.block
+        div(style="width: 300px; height: 400px; background-color: #FFFFFF !important;")
+          canvas(id="chartBar" ref="chartBar" width="300" height="400")
+      .bar-chart-block.block
+        h2.titular Mapa de la vivienda
+        div(id="map" ref="map" style="width: 300px; height: 400px;")
+  footer
+    #main.row
+      .twelve.columns
+        h1 Revisar cambios en las casas para cobro de impuesto municipal
+        p El cobro del impuesto municipal 
+        h5 COBRO MUNICIPAL
+        #counter.cf
+          span {{ totalPay }}
+            em Total a pagar
+  // main end
 script(src="https://cdn.jsdelivr.net/npm/socket.io-client@2/dist/socket.io.js")
 script(src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js")
+script(src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js")
+script(src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD3CTmn15ctpbfDBYwFZc1-eAHeXpfLRi8")
 script.
   const app = new Vue({
     el: '#app',
     data: {
+      socketArduino: null,
+      ctx: null,
+      map: null,
+      markers: [],
       totalPay: 0,
-      infoHouse: 0,
-      location: 0,
-      socketArduino: null
+      graph1: {
+        type: 'pie',
+        data: {
+          labels: ['3', '2', '1'],
+          datasets: [{
+            label: 'Pisos de la vivienda',
+            data: [],
+            backgroundColor: [],
+            borderWidth: 1
+          }]
+        },
+        options: {}
+      },
+      graph2: {
+        type: 'line',
+        data: {
+          labels: ['3', '2', '1'],
+          datasets: [{
+            label: 'Impuesto Predial',
+            data: [],
+            backgroundColor: [],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: {
+            yAxes: [{
+              ticks: {
+                beginAtZero: true
+              }
+            }]
+          }
+        }
+      },
+      graph3: {
+        type: 'bar',
+        data: {
+          labels: ['3', '2', '1'],
+          datasets: [{
+            label: 'Pisos de la vivienda',
+            data: [],
+            backgroundColor: [],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: {
+            yAxes: [{
+              ticks: {
+                beginAtZero: true
+              }
+            }]
+          }
+        }
+      },
+      chartPie: null,
+      chartLine: null,
+      chartBar: null
     },
     mounted() {
-      this.socketArduino = io.connect('http://localhost:3000/arduino',{
+      this.ctxChartPie = this.$refs.chartPie.getContext('2d')
+      this.ctxChartLine = this.$refs.chartLine.getContext('2d')
+      this.ctxChartBar = this.$refs.chartBar.getContext('2d')
+
+      this.chartPie = new Chart(this.ctxChartPie, this.graph1)
+      this.chartLine = new Chart(this.ctxChartLine, this.graph2)
+      this.chartBar = new Chart(this.ctxChartBar, this.graph3)
+      this.socketArduino = io.connect('http://192.168.1.12:3000/arduino',{
         forceNew: true
       })
       this.sockets()
+      this.initMap()
     },
     methods: {
+      initMap() {
+        this.map = new google.maps.Map(this.$refs.map, {
+          center: {
+            lat: -12.110158934695,
+            lng: -77.022099494934
+          },
+          zoom: 13,
+          mapTypeId: google.maps.MapTypeId.ROADMAP
+        })
+      },
+      setMapOnAll(map) {
+        for (let i = 0; i < this.markers.length; i++) {
+          this.markers[i].setMap(map)
+        }
+      },
+      getRandomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+          color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+      },
       sockets() {
         this.socketArduino.on('cTotalPay', data => {
           this.totalPay = data
+          this.chartPie.data.datasets.forEach((dataset, index) => {
+            dataset = this.chartPie.data.datasets[index]
+            dataset.data.push(data)
+            dataset.backgroundColor.push(this.getRandomColor())
+            if (dataset.data.length > 3) {
+              dataset.data.shift()
+              dataset.backgroundColor.shift()
+            }
+          })
+          this.chartLine.data.datasets.forEach((dataset, index) => {
+            dataset = this.chartLine.data.datasets[index]
+            dataset.data.push(data)
+            dataset.backgroundColor.push(this.getRandomColor())
+            if (dataset.data.length > 3) {
+              dataset.data.shift()
+              dataset.backgroundColor.shift()
+            }
+          })
+
+          this.chartPie.update()
+          this.chartLine.update()
         })
         this.socketArduino.on('cInfoHouse', data => {
-          this.infoHouse = data
+          this.chartBar.data.datasets.forEach((dataset, index) => {
+            dataset = this.chartBar.data.datasets[index]
+            dataset.data.push(data)
+            dataset.backgroundColor.push(this.getRandomColor())
+            if (dataset.data.length > 3) {
+              dataset.data.shift()
+              dataset.backgroundColor.shift()
+            }
+          })
+          this.chartBar.update()
         })
         this.socketArduino.on('cLocation', data => {
-          this.location = data
+          data = data.replace('', '')
+          data = data.split(' ')
+          if (data.length == 6) {
+            const latitude = eval(data[2])
+            const longitude = eval(data[5])
+            this.setMapOnAll(null)
+            const myLatLng = {
+              lat: latitude,
+              lng: longitude
+            }
+            const marker = new google.maps.Marker({
+              position: myLatLng,
+              map: this.map,
+              title: 'Ubicación'
+            })
+            this.markers.push(marker)
+            this.map.setCenter(myLatLng)
+          }
         })
       }
     }
